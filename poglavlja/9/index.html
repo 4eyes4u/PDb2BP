@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+    integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.5.0 -->
+<title>Napredne tehnike razvijanja Java/SQL aplikacija | Programiranje Db2 baza podataka</title>
+<meta name="generator" content="Jekyll v3.8.5" />
+<meta property="og:title" content="Napredne tehnike razvijanja Java/SQL aplikacija" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Elektronska knjiga “Programiranje Db2 baza podataka” dostupna besplatno na adresi" />
+<meta property="og:description" content="Elektronska knjiga “Programiranje Db2 baza podataka” dostupna besplatno na adresi" />
+<link rel="canonical" href="https://theikeofficial.github.io//PDb2BP/poglavlja/9/" />
+<meta property="og:url" content="https://theikeofficial.github.io//PDb2BP/poglavlja/9/" />
+<meta property="og:site_name" content="Programiranje Db2 baza podataka" />
+<script type="application/ld+json">
+{"description":"Elektronska knjiga “Programiranje Db2 baza podataka” dostupna besplatno na adresi","@type":"WebPage","url":"https://theikeofficial.github.io//PDb2BP/poglavlja/9/","headline":"Napredne tehnike razvijanja Java/SQL aplikacija","@context":"http://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/PDb2BP/assets/main.css"><link type="application/atom+xml" rel="alternate" href="https://theikeofficial.github.io//PDb2BP/feed.xml" title="Programiranje Db2 baza podataka" /></head>
+<body><header class="site-header" role="banner"
+    style="background-image: url(/PDb2BP/resources/header.png); height: 300px; background-repeat: repeat-x;"><a class="site-title" rel="author" href="/PDb2BP/"
+        style="display: flex; position: relative; top: 125px; background-color: white; width: 100%; height: 86px;flex-wrap: wrap; justify-content: center; align-items: center; line-height: 0px; font-size: 36px;">
+        
+        
+        <span style="font-weight: bold;">PROGRAMIRANJE&nbsp;</span>
+        
+        <span style="font-weight: bold;">DB2&nbsp;</span>
+        
+        <span style="font-weight: bold;">BAZA&nbsp;</span>
+        
+        <span style="font-weight: bold;">PODATAKA&nbsp;</span>
+        
+    </a>
+</header><main class="page-content" aria-label="Content">
+        <div class="wrapper" style="max-width: calc(1100px - (30px * 2));">
+            <article class="post">
+
+  <header class="post-header">
+    <h1 class="post-title">9. Napredne tehnike razvijanja Java/SQL aplikacija</h1>
+  </header>
+
+  <div class="post-content">
+    <p>U ovom poglavlju ćemo demonstrirati rad sa transakcijama, rad u konkurentnom okruženju,
+kao i povezivanje na više baza podataka u JDBC aplikacijama.</p>
+
+<h2 id="91-transakcioni-rad">9.1 Transakcioni rad</h2>
+
+<p>JDBC supports the following concepts:</p>
+
+<ul>
+  <li>Setting the Auto-Commit Mode</li>
+  <li>Transaction isolation level</li>
+  <li>Savepoints</li>
+</ul>
+
+<h3 id="911-auto-commit-mode">9.1.1 Auto-Commit Mode</h3>
+
+<p>When you connect to a database, the auto-commit property for the Connection object
+is set to true by default. If a connection is in the auto-commit mode, a SQL statement
+is committed automatically after its successful execution. If a connection is not in the
+auto-commit mode, you must call the commit() or rollback() method of the Connection
+object to commit or roll back a transaction. Typically, you disable the auto-commit mode
+for a connection in a JDBC application, so the logic in your application controls the
+final outcome of the transaction. To disable the auto-commit mode, you need to call the
+setAutoCommit(false) on the Connection object after a connection has been established.
+If a connection URL allows you to set the auto-commit mode, you can also specify it as
+part of the connection URL. You set the auto-commit mode of your connection in the
+JDBCUtil.getConnection() method to false after you get a Connection object.</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Get a connection</span>
+<span class="n">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="n">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">dbURL</span><span class="o">,</span> <span class="n">userId</span><span class="o">,</span> <span class="n">password</span><span class="o">);</span>
+
+<span class="c1">// Set the auto-commit off</span>
+<span class="n">con</span><span class="o">.</span><span class="na">setAutoCommit</span><span class="o">(</span><span class="kc">false</span><span class="o">);</span>
+</code></pre></div></div>
+
+<p>If you have enabled the auto-commit mode for your connection, you cannot use its commit()
+and rollback() methods. Calling the commit() and rollback() methods on a Connection
+object, which has enabled the auto-commit mode, throws a SQLException.</p>
+
+<p>If the setAutoCommit() method is called to change the auto-commit mode of a connection
+in the middle of a transaction, the transaction is committed at that time. Typically, you
+would set the auto-commit mode of a connection just after connecting to the database.</p>
+
+<h4 id="committing-and-rolling-back-transactions">Committing and Rolling Back Transactions</h4>
+
+<p>If the auto-commit mode is disabled for a connection, you can use the commit() or rollback()
+method to commit or roll back a transaction. Typical code in a JDBC application
+that performs a database transaction is as shown:</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Get a connection</span>
+<span class="n">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="n">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">dbURL</span><span class="o">,</span> <span class="n">userId</span><span class="o">,</span> <span class="n">password</span><span class="o">);</span>
+<span class="c1">// Set the auto-commit off</span>
+<span class="n">con</span><span class="o">.</span><span class="na">setAutoCommit</span><span class="o">(</span><span class="kc">false</span><span class="o">);</span>
+
+<span class="k">try</span> <span class="o">{</span>
+    <span class="c1">// Perform database transaction activities here</span>
+    
+    <span class="c1">// Successful scenario:</span>
+    <span class="n">con</span><span class="o">.</span><span class="na">commit</span><span class="o">();</span>
+    <span class="c1">// Close the connection</span>
+    <span class="n">conn</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+<span class="o">}</span>
+<span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+    <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"An error occured: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getMessage</span><span class="o">());</span>
+    <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Rolling back the transaction"</span><span class="o">);</span>
+
+    <span class="k">try</span> <span class="o">{</span>
+        <span class="c1">// Unsuccessful scenario:</span>
+        <span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+        <span class="c1">// Close the connection</span>
+        <span class="n">conn</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+    <span class="o">}</span>
+    <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+    <span class="o">}</span>
+
+    <span class="n">System</span><span class="o">.</span><span class="na">exit</span><span class="o">(</span><span class="mi">1</span><span class="o">);</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<div style="border: 2px solid rgb(196, 41, 255); padding: 5px; background-color: rgba(197, 197, 197, 0.3); margin: 10px 0;">
+    <p style="font-weight: bold;">Zadatak 9.1</p>
+    Napisati Java program u kojem se SQL naredbe izvršavaju dinamički koji redom:<br />
+<br />
+1. Pronalazi i ispisuje najveći indeks iz tabele <span style="color: #e83e8c; background-color: #eef; padding: 1px 5px; font-family: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;">ISPIT</span>.<br />
+2. Briše studenta sa pronađenim indeksom iz tabele <span style="color: #e83e8c; background-color: #eef; padding: 1px 5px; font-family: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;">ISPIT</span> i ispisuje poruku korisniku o uspešnosti brisanja.<br />
+3. Ponovo pronalazi i ispisuje najveći indeks iz tabele <span style="color: #e83e8c; background-color: #eef; padding: 1px 5px; font-family: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;">ISPIT</span>.<br />
+4. Pita korisnika da li želi da potvrdi ili poništi izmene. U zavisnosti od korisnikovog odgovora, aplikacija potvrđuje ili poništava izmene uz ispisivanje poruke korisniku.<br />
+5. Ponovo pronalazi i ispisuje najveći indeks iz tabele <span style="color: #e83e8c; background-color: #eef; padding: 1px 5px; font-family: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;">ISPIT</span>.<br />
+</div>
+
+<p>Rešenje:</p>
+
+<p>Datoteka: <code class="highlighter-rouge">primeri/poglavlje_9/src/zadatak_9_1/Main.java</code>:</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">package</span> <span class="n">zadatak_9_1</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">java.sql.*</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.util.Scanner</span><span class="o">;</span>
+
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">Main</span> <span class="o">{</span>
+    <span class="kd">static</span> <span class="o">{</span>
+        <span class="k">try</span> <span class="o">{</span>
+            <span class="n">Class</span><span class="o">.</span><span class="na">forName</span><span class="o">(</span><span class="s">"com.ibm.db2.jcc.DB2Driver"</span><span class="o">);</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">Exception</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">main</span><span class="o">(</span><span class="n">String</span> <span class="n">argv</span><span class="o">[])</span> <span class="o">{</span>
+        <span class="n">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="n">String</span> <span class="n">url</span> <span class="o">=</span> <span class="s">"jdbc:db2://localhost:50001/vstud"</span><span class="o">;</span>
+
+        <span class="k">try</span> <span class="o">{</span>
+            <span class="n">con</span> <span class="o">=</span> <span class="n">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">url</span><span class="o">,</span> <span class="s">"student"</span><span class="o">,</span> <span class="s">"abcdef"</span><span class="o">);</span>
+            
+            <span class="c1">// Iskljucujemo automatsko potvrdjivanje izmena</span>
+            <span class="n">con</span><span class="o">.</span><span class="na">setAutoCommit</span><span class="o">(</span><span class="kc">false</span><span class="o">);</span>
+
+            <span class="n">Integer</span> <span class="n">indeks</span> <span class="o">=</span> <span class="n">pronadji_najveci_indeks</span><span class="o">(</span><span class="n">con</span><span class="o">);</span>
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"1. Najveci indeks u tabeli ISPIT je "</span> <span class="o">+</span> <span class="n">indeks</span><span class="o">);</span>
+            <span class="n">obrisi_ispite</span><span class="o">(</span><span class="n">con</span><span class="o">,</span> <span class="n">indeks</span><span class="o">);</span>
+            <span class="n">indeks</span> <span class="o">=</span> <span class="n">pronadji_najveci_indeks</span><span class="o">(</span><span class="n">con</span><span class="o">);</span>
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"3. Najveci indeks u tabeli ISPIT je "</span> <span class="o">+</span> <span class="n">indeks</span><span class="o">);</span>
+            <span class="n">potvrdi_ili_ponisti_izmene</span><span class="o">(</span><span class="n">con</span><span class="o">);</span>
+            <span class="n">indeks</span> <span class="o">=</span> <span class="n">pronadji_najveci_indeks</span><span class="o">(</span><span class="n">con</span><span class="o">);</span>
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"5. Najveci indeks u tabeli ISPIT je "</span> <span class="o">+</span> <span class="n">indeks</span><span class="o">);</span>
+            
+            <span class="c1">// S obzirom da je sve proslo kako treba ako se doslo do ove tacke,</span>
+            <span class="c1">// potvrdjujemo izmene pre raskidanje konekcije</span>
+            <span class="n">con</span><span class="o">.</span><span class="na">commit</span><span class="o">();</span>
+            <span class="n">con</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"SQLCODE: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">+</span> <span class="s">"\n"</span> <span class="o">+</span> <span class="s">"SQLSTATE: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getSQLState</span><span class="o">()</span> <span class="o">+</span> <span class="s">"\n"</span>
+                    <span class="o">+</span> <span class="s">"PORUKA: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getMessage</span><span class="o">());</span>
+
+            <span class="c1">// U slucaju neuspeha, ponistavamo eventualne izmene i zatvaramo konekciju.</span>
+            <span class="c1">// Pozivi metoda rollback() i close() ispod mogu da izbace SQLException,</span>
+            <span class="c1">// ali njih ignorisemo, te je zato catch blok prazan.</span>
+            <span class="k">try</span> <span class="o">{</span>
+                <span class="k">if</span> <span class="o">(</span><span class="kc">null</span> <span class="o">!=</span> <span class="n">con</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+                    <span class="n">con</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                <span class="o">}</span>
+            <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e2</span><span class="o">)</span> <span class="o">{</span>
+            <span class="o">}</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">exit</span><span class="o">(</span><span class="mi">1</span><span class="o">);</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">Exception</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+
+            <span class="k">try</span> <span class="o">{</span>
+                <span class="k">if</span> <span class="o">(</span><span class="kc">null</span> <span class="o">!=</span> <span class="n">con</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+                    <span class="n">con</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                <span class="o">}</span>
+            <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e2</span><span class="o">)</span> <span class="o">{</span>
+            <span class="o">}</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">exit</span><span class="o">(</span><span class="mi">2</span><span class="o">);</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="n">Integer</span> <span class="nf">pronadji_najveci_indeks</span><span class="o">(</span><span class="n">Connection</span> <span class="n">con</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span><span class="o">,</span> <span class="n">Exception</span> <span class="o">{</span>
+        <span class="n">String</span> <span class="n">sql</span> <span class="o">=</span> 
+            <span class="s">"SELECT MAX(INDEKS)"</span> <span class="o">+</span>
+            <span class="s">"FROM   ISPIT"</span><span class="o">;</span>
+        <span class="n">Statement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">createStatement</span><span class="o">();</span>
+        <span class="n">ResultSet</span> <span class="n">kursor</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">executeQuery</span><span class="o">(</span><span class="n">sql</span><span class="o">);</span>
+        
+        <span class="n">Integer</span> <span class="n">indeks</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="kt">boolean</span> <span class="n">imaRezultata</span> <span class="o">=</span> <span class="n">kursor</span><span class="o">.</span><span class="na">next</span><span class="o">();</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">imaRezultata</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">indeks</span> <span class="o">=</span> <span class="n">kursor</span><span class="o">.</span><span class="na">getInt</span><span class="o">(</span><span class="mi">1</span><span class="o">);</span>
+        <span class="o">}</span>
+        <span class="k">else</span> <span class="o">{</span>
+            <span class="k">throw</span> <span class="k">new</span> <span class="nf">Exception</span><span class="o">(</span><span class="s">"Nema ispita u bazi"</span><span class="o">);</span>
+        <span class="o">}</span>
+        
+        <span class="n">kursor</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+        <span class="n">stmt</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+        
+        <span class="k">return</span> <span class="n">indeks</span><span class="o">;</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">obrisi_ispite</span><span class="o">(</span><span class="n">Connection</span> <span class="n">con</span><span class="o">,</span> <span class="n">Integer</span> <span class="n">indeks</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span> <span class="o">{</span>
+        <span class="n">String</span> <span class="n">sql</span> <span class="o">=</span> 
+            <span class="s">"DELETE FROM ISPIT "</span> <span class="o">+</span>
+            <span class="s">"WHERE  INDEKS = ?"</span><span class="o">;</span>
+        <span class="n">PreparedStatement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">prepareStatement</span><span class="o">(</span><span class="n">sql</span><span class="o">);</span>
+        <span class="n">stmt</span><span class="o">.</span><span class="na">setInt</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="n">indeks</span><span class="o">);</span>
+        
+        <span class="n">stmt</span><span class="o">.</span><span class="na">executeUpdate</span><span class="o">();</span>
+        
+        <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"2. Obrisani su ispiti za studenta sa indeksom "</span> <span class="o">+</span> <span class="n">indeks</span><span class="o">);</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">potvrdi_ili_ponisti_izmene</span><span class="o">(</span><span class="n">Connection</span> <span class="n">con</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span> <span class="o">{</span>
+        <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"4. Da li zelite da potvrdite izmene [y] ili da ponistite izmene [n]?"</span><span class="o">);</span>
+        <span class="k">try</span> <span class="o">(</span><span class="n">Scanner</span> <span class="n">ulaz</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Scanner</span><span class="o">(</span><span class="n">System</span><span class="o">.</span><span class="na">in</span><span class="o">))</span> <span class="o">{</span>
+            <span class="n">String</span> <span class="n">odgovor</span> <span class="o">=</span> <span class="n">ulaz</span><span class="o">.</span><span class="na">next</span><span class="o">();</span>
+            <span class="k">if</span> <span class="o">(</span><span class="n">odgovor</span><span class="o">.</span><span class="na">equalsIgnoreCase</span><span class="o">(</span><span class="s">"y"</span><span class="o">))</span> <span class="o">{</span>
+                <span class="c1">// Potvrdjivanje izmena</span>
+                <span class="n">con</span><span class="o">.</span><span class="na">commit</span><span class="o">();</span>
+                <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Izmene su potvrdjene!"</span><span class="o">);</span>
+            <span class="o">}</span>
+            <span class="k">else</span> <span class="o">{</span>
+                <span class="c1">// Ponistavanje izmena</span>
+                <span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+                <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Izmene su ponistene!"</span><span class="o">);</span>
+            <span class="o">}</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h3 id="912-transaction-isolation-level">9.1.2 Transaction Isolation Level</h3>
+
+<p>The ANSI SQL-92 standard defines four transaction isolation levels in terms of the data
+consistency. Each isolation level defines what kinds of data inconsistencies are allowed, or
+not allowed. The four transaction isolation levels are as follows:</p>
+
+<ul>
+  <li>Read uncommitted</li>
+  <li>Read committed</li>
+  <li>Repeatable read</li>
+  <li>Serializable</li>
+</ul>
+
+<p>Java defines the following four constants in the Connection interface that correspond to
+the four isolation levels defined by the ANSI SQL-92 standard:</p>
+
+<ul>
+  <li>TRANSACTION_READ_UNCOMMITTED</li>
+  <li>TRANSACTION_READ_COMMITTED</li>
+  <li>TRANSACTION_REPEATABLE_READ</li>
+  <li>TRANSACTION_SERIALIZABLE</li>
+</ul>
+
+<p>You can set the isolation level of a transaction for a database connection using the set-
+TransactionIsolation(int level) method of the Connection interface.</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Get a Connection object</span>
+<span class="n">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="n">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">dbURL</span><span class="o">,</span> <span class="n">userId</span><span class="o">,</span> <span class="n">password</span><span class="o">);</span>
+
+<span class="c1">// Set the transaction isolation level to read committed</span>
+<span class="n">con</span><span class="o">.</span><span class="na">setTransactionIsolation</span><span class="o">(</span><span class="n">Connection</span><span class="o">.</span><span class="na">TRANSACTION_READ_COMMITTED</span><span class="o">);</span>
+</code></pre></div></div>
+
+<p>TODO: dodati zadatke za ovaj deo gradiva</p>
+
+<h3 id="913-savepoints-in-a-transaction">9.1.3 Savepoints in a Transaction</h3>
+
+<p>A database transaction consists of one or more changes as a unit of work. A savepoint in
+a transaction is like a marker that marks a point in a transaction so that, if needed, the
+transaction can be rolled back (or undone) up to that point.</p>
+
+<p>An object of the Savepoint interface represents a savepoint in a transaction. To mark a
+savepoint in a transaction, you simply call the setSavepoint() method of the Connection.
+The setSavepoint() method is overloaded. One version accepts no argument and another
+accepts a string, which is the name of the savepoint. The setSavepoint() method returns
+a Savepoint object, which is your marker and you must keep it for future use. Here’s an
+example:</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="n">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">dbURL</span><span class="o">,</span> <span class="n">userId</span><span class="o">,</span> <span class="n">password</span><span class="o">);</span>
+<span class="n">con</span><span class="o">.</span><span class="na">setAutoCommit</span><span class="o">(</span><span class="kc">false</span><span class="o">);</span>
+
+<span class="n">Statement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">createStatement</span><span class="o">();</span>
+
+<span class="n">stmt</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">"insert into person values ('John', 'Doe')"</span><span class="o">);</span>
+<span class="n">Savepoint</span> <span class="n">sp1</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">setSavepoint</span><span class="o">();</span> <span class="c1">// 1</span>
+
+<span class="n">stmt</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">"insert into person values ('Jane', 'Doe')"</span><span class="o">);</span>
+<span class="n">Savepoint</span> <span class="n">sp2</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">setSavepoint</span><span class="o">();</span> <span class="c1">// 2</span>
+
+<span class="n">stmt</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">"insert into person values ('Another', 'Unknown')"</span><span class="o">);</span>
+<span class="n">Savepoint</span> <span class="n">sp3</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">setSavepoint</span><span class="o">();</span> <span class="c1">// 3</span>
+</code></pre></div></div>
+
+<p>At this point, you have finer control on the transaction if you want to undo any of these
+three inserts into the person table. Now you can use another version of the rollback()
+method of the Connection, which accepts a Savepoint object. If you want to undo all
+changes that were made after savepoint 1, you can do so as follows:</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Rolls back inserts 2 and 3</span>
+<span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">(</span><span class="n">sp1</span><span class="o">);</span>
+</code></pre></div></div>
+
+<p>Once you roll back up to a savepoint (say, spx), all savepoints that were created after the
+savepoint spx are released and you cannot refer to them again. If you refer to a released
+savepoint, the JDBC driver will throw a SQLException. The following snippet of code
+will throw a SQLException:</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">(</span><span class="n">sp2</span><span class="o">);</span> <span class="c1">// Will release sp3</span>
+<span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">(</span><span class="n">sp3</span><span class="o">);</span> <span class="c1">// Will throw an exception: sp3 is already released.</span>
+</code></pre></div></div>
+
+<p>Note that when you roll back a transaction to a savepoint, that savepoint itself is not
+released. When you call, for example, con.rollback(sp2), savepoint sp2 remains valid. You
+can add more savepoints afterward and roll back up to savepoint sp2 again.</p>
+
+<p>TODO: dodati zadatke za ovaj deo gradiva</p>
+
+<h2 id="92-rad-u-višekorisničkom-okruženju">9.2 Rad u višekorisničkom okruženju</h2>
+
+<p>U poglavlju 5 smo govorili detaljno o problemima konkurentnog rada sa bazom podataka.
+Aplikacije pisane u programskom jeziku Java, bilo one SQLJ ili JDBC, takođe “boluju” od
+istih problema kao i aplikacije koje smo pisali u programskom jeziku C. Zbog toga ćemo
+imati na umu sve napomene koje smo tada uveli, sa određenim napomenama koje slede u
+daljem tekstu.</p>
+
+<p>S obzirom da se u programskom jeziku Java greške prijavljuju kroz objekte klase SQLException, 
+proveru da li je došlo do nekog problema konkurentnog okruženja možemo izvršiti proverom
+koda greške, pozivom metoda getErrorCode() nad objektom klase SQLException koji
+smo uhvatili. Zašto nam je ova informacija važna? Prisetimo se da, ukoliko dođe do nekog
+problema konkurentnog okruženja, DB2 SUBP šalje grešku 􀀀911 ili 􀀀913. U tom slučaju,
+potrebno je izvršiti obradu isteka vremena ili pojave mrtve petlje, i poništiti eventualne
+izmene. Evo jednog primera:</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// U main funkciji:</span>
+
+<span class="n">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+<span class="n">String</span> <span class="n">sql</span> <span class="o">=</span> <span class="s">"SELECT ..."</span><span class="o">;</span>
+<span class="n">Statement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">createStatement</span><span class="o">(</span>
+    <span class="n">ResultSet</span><span class="o">.</span><span class="na">TYPE_FORWARD_ONLY</span><span class="o">,</span>
+    <span class="n">ResultSet</span><span class="o">.</span><span class="na">CONCUR_UPDATABLE</span><span class="o">,</span>
+    <span class="n">ResultSet</span><span class="o">.</span><span class="na">HOLD_CURSORS_OVER_COMMIT</span>
+<span class="o">);</span>
+<span class="n">ResultSet</span> <span class="n">kursor</span> <span class="o">=</span> <span class="n">otvoriKursor</span><span class="o">(</span><span class="n">stmt</span><span class="o">,</span> <span class="n">sql</span><span class="o">);</span>
+
+<span class="c1">// Petlja koja prolazi kroz kursor</span>
+<span class="k">while</span><span class="o">(</span><span class="kc">true</span><span class="o">)</span> <span class="o">{</span>
+    <span class="k">try</span> <span class="o">{</span>
+        <span class="c1">// Kod koji moze da dovede do problema</span>
+        <span class="c1">// u visekorisnickom okruzenju</span>
+    <span class="o">}</span>
+    <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+        <span class="c1">// Ako je doslo do izuzetka zbog katanaca...</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">==</span> <span class="o">-</span><span class="mi">911</span> <span class="o">||</span> <span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">==</span> <span class="o">-</span><span class="mi">913</span><span class="o">)</span> <span class="o">{</span>
+            <span class="c1">// ... onda ih je potrebno obraditi</span>
+            <span class="n">kursor</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+            <span class="n">kursor</span> <span class="o">=</span> <span class="n">obradiCekanje</span><span class="o">(</span><span class="s">"FETCH, UPDATE, ..."</span><span class="o">,</span> <span class="n">con</span><span class="o">,</span> <span class="n">stmt</span><span class="o">,</span> <span class="n">sql</span><span class="o">);</span>
+            <span class="k">continue</span><span class="o">;</span>
+        <span class="o">}</span>
+        <span class="c1">// Inace, neka druga greska je u pitanju,</span>
+        <span class="c1">// pa ju je potrebno proslediti kodu za obradu greske</span>
+        <span class="k">throw</span> <span class="n">e</span><span class="o">;</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+
+<span class="c1">// ∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗∗</span>
+<span class="c1">// Izvan main funkcije:</span>
+<span class="kd">private</span> <span class="kd">static</span> <span class="n">ResultSet</span> <span class="nf">otvoriKursor</span><span class="o">(</span><span class="n">Statement</span> <span class="n">stmt</span><span class="o">,</span> <span class="n">String</span> <span class="n">sql</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span> <span class="o">{</span>
+    <span class="n">ResultSet</span> <span class="n">kursor</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">executeQuery</span><span class="o">(</span><span class="n">sql</span><span class="o">);</span>
+    <span class="k">return</span> <span class="n">kursor</span><span class="o">;</span>
+<span class="o">}</span>
+
+<span class="kd">private</span> <span class="kd">static</span> <span class="n">ResultSet</span> <span class="nf">obradiCekanje</span><span class="o">(</span><span class="n">String</span> <span class="n">codeHint</span><span class="o">,</span> <span class="n">Connection</span> <span class="n">con</span><span class="o">,</span> <span class="n">Statement</span> <span class="n">stmt</span><span class="o">,</span> <span class="n">String</span> <span class="n">sql</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span> <span class="o">{</span>
+    <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">printf</span><span class="o">(</span><span class="s">"[%s] Objekat je zakljucan od strane druge transakcije!\n"</span> <span class="o">+</span>
+        <span class="s">"Molimo sacekajte!\n"</span><span class="o">,</span> <span class="n">codeHint</span><span class="o">);</span>
+
+    <span class="k">try</span> <span class="o">{</span>
+        <span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+    <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+    <span class="o">}</span>
+
+    <span class="k">return</span> <span class="nf">otvoriKursor</span><span class="o">(</span><span class="n">stmt</span><span class="o">,</span> <span class="n">sql</span><span class="o">);</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>Naredni primeri ilustruju konstrukciju JDBC aplikacija koje koriste transakcioni rad u
+višekorisničkom okruženju.</p>
+
+<div style="border: 2px solid rgb(196, 41, 255); padding: 5px; background-color: rgba(197, 197, 197, 0.3); margin: 10px 0;">
+    <p style="font-weight: bold;">Zadatak 9.2</p>
+    Napisati Java program u kojem se SQL naredbe izvršavaju dinamički koji za svaki predmet koji je obavezan na smeru čiji je identifikator 201, pita korisnika da li želi da poveća broj bodova za 1. Ukoliko je odgovor korisnika ”da”, izvršava se odgovarajuća naredba. Zadatak uraditi tako da aplikacija radi u višekorisničkom okruženju. Obrada jednog predmeta treba da predstavlja jednu transakciju. Postaviti istek vremena na 5 sekundi.
+</div>
+
+<p>Rešenje: Pre početka izvršavanja, kreirati tabelu <code class="highlighter-rouge">OBRADJENI_PREDMETI</code> koja sadrži identifikatore predmeta koji su do sada obrađeni:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">OBRADJENI_PREDMETI</span> <span class="p">(</span>
+    <span class="n">ID_PREDMETA</span> <span class="n">INTEGER</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="k">PRIMARY</span> <span class="k">KEY</span> <span class="p">(</span><span class="n">ID_PREDMETA</span><span class="p">),</span>
+    <span class="k">FOREIGN</span> <span class="k">KEY</span> <span class="p">(</span><span class="n">ID_PREDMETA</span><span class="p">)</span> <span class="k">REFERENCES</span> <span class="n">PREDMET</span>
+<span class="p">)</span>
+</code></pre></div></div>
+
+<p>Datoteka: <code class="highlighter-rouge">primeri/poglavlje_9/src/zadatak_9_2/Main.java</code>:</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">package</span> <span class="n">zadatak_9_2</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">java.sql.*</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.util.Scanner</span><span class="o">;</span>
+
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">Main</span> <span class="o">{</span>
+    <span class="kd">static</span> <span class="o">{</span>
+        <span class="k">try</span> <span class="o">{</span>
+            <span class="n">Class</span><span class="o">.</span><span class="na">forName</span><span class="o">(</span><span class="s">"com.ibm.db2.jcc.DB2Driver"</span><span class="o">);</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">Exception</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">main</span><span class="o">(</span><span class="n">String</span> <span class="n">argv</span><span class="o">[])</span> <span class="o">{</span>
+        <span class="n">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="n">String</span> <span class="n">url</span> <span class="o">=</span> <span class="s">"jdbc:db2://localhost:50001/vstud"</span><span class="o">;</span>
+
+        <span class="k">try</span> <span class="o">{</span>
+            <span class="n">con</span> <span class="o">=</span> <span class="n">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">url</span><span class="o">,</span> <span class="s">"student"</span><span class="o">,</span> <span class="s">"abcdef"</span><span class="o">);</span>
+            <span class="n">con</span><span class="o">.</span><span class="na">setAutoCommit</span><span class="o">(</span><span class="kc">false</span><span class="o">);</span>
+
+            <span class="c1">// Postavljanje isteka vremena za katance.</span>
+            <span class="n">Statement</span> <span class="n">lockStmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">createStatement</span><span class="o">();</span>
+            <span class="n">lockStmt</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">"SET CURRENT LOCK TIMEOUT 5"</span><span class="o">);</span>
+            
+            <span class="n">obradiPredmete</span><span class="o">(</span><span class="n">con</span><span class="o">);</span>
+            
+            <span class="c1">// Vracanje podrazumevane vrednosti za istek vremena</span>
+            <span class="n">lockStmt</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">"SET CURRENT LOCK TIMEOUT NULL"</span><span class="o">);</span>
+            <span class="n">lockStmt</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+            
+            <span class="n">con</span><span class="o">.</span><span class="na">commit</span><span class="o">();</span>
+            <span class="n">con</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"SQLCODE: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">+</span> <span class="s">"\n"</span> <span class="o">+</span> <span class="s">"SQLSTATE: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getSQLState</span><span class="o">()</span> <span class="o">+</span> <span class="s">"\n"</span>
+                    <span class="o">+</span> <span class="s">"PORUKA: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getMessage</span><span class="o">());</span>
+
+            <span class="c1">// U slucaju neuspeha, ponistavamo eventualne izmene i zatvaramo konekciju.</span>
+            <span class="c1">// Pozivi metoda rollback() i close() ispod mogu da izbace SQLException,</span>
+            <span class="c1">// ali njih ignorisemo, te je zato catch blok prazan.</span>
+            <span class="k">try</span> <span class="o">{</span>
+                <span class="k">if</span> <span class="o">(</span><span class="kc">null</span> <span class="o">!=</span> <span class="n">con</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+                    <span class="n">con</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                <span class="o">}</span>
+            <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e2</span><span class="o">)</span> <span class="o">{</span>
+            <span class="o">}</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">exit</span><span class="o">(</span><span class="mi">1</span><span class="o">);</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">Exception</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+
+            <span class="k">try</span> <span class="o">{</span>
+                <span class="k">if</span> <span class="o">(</span><span class="kc">null</span> <span class="o">!=</span> <span class="n">con</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+                    <span class="n">con</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                <span class="o">}</span>
+            <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e2</span><span class="o">)</span> <span class="o">{</span>
+            <span class="o">}</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">exit</span><span class="o">(</span><span class="mi">2</span><span class="o">);</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">obradiPredmete</span><span class="o">(</span><span class="n">Connection</span> <span class="n">con</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span> <span class="o">{</span>
+        <span class="k">try</span> <span class="o">(</span><span class="n">Scanner</span> <span class="n">ulaz</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Scanner</span><span class="o">(</span><span class="n">System</span><span class="o">.</span><span class="na">in</span><span class="o">))</span> <span class="o">{</span>
+            <span class="n">String</span> <span class="n">sql</span> <span class="o">=</span> 
+                <span class="s">"SELECT ID_PREDMETA, "</span> <span class="o">+</span> 
+                <span class="s">"       NAZIV, "</span> <span class="o">+</span> 
+                <span class="s">"       BODOVI "</span> <span class="o">+</span>
+                <span class="s">"FROM   PREDMET "</span> <span class="o">+</span>
+                <span class="s">"WHERE  ID_PREDMETA IN ( "</span> <span class="o">+</span>
+                <span class="s">"           SELECT  ID_PREDMETA "</span> <span class="o">+</span>
+                <span class="s">"           FROM    OBAVEZAN_PREDMET "</span> <span class="o">+</span>
+                <span class="s">"           WHERE   ID_SMERA = 201 "</span> <span class="o">+</span>
+                <span class="s">"       ) AND "</span> <span class="o">+</span>
+                <span class="s">"       ID_PREDMETA NOT IN ( "</span> <span class="o">+</span> 
+                <span class="s">"           SELECT  ID_PREDMETA "</span> <span class="o">+</span>
+                <span class="s">"           FROM    OBRADJENI_PREDMETI"</span> <span class="o">+</span>
+                <span class="s">"       )"</span><span class="o">;</span>
+                
+            <span class="n">Statement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">createStatement</span><span class="o">(</span>
+                <span class="n">ResultSet</span><span class="o">.</span><span class="na">TYPE_FORWARD_ONLY</span><span class="o">,</span> 
+                <span class="n">ResultSet</span><span class="o">.</span><span class="na">CONCUR_UPDATABLE</span><span class="o">,</span>
+                <span class="c1">// Kursor deklarisemo sa opcijom HOLD_CURSORS_OVER_COMMIT</span>
+                <span class="c1">// da bi ostao otvoren prilikom izvrsavanja COMMIT naredbe.</span>
+                <span class="n">ResultSet</span><span class="o">.</span><span class="na">HOLD_CURSORS_OVER_COMMIT</span><span class="o">);</span>
+            
+            <span class="n">ResultSet</span> <span class="n">kursor</span> <span class="o">=</span> <span class="n">otvoriKursor</span><span class="o">(</span><span class="n">stmt</span><span class="o">,</span> <span class="n">sql</span><span class="o">);</span>
+            
+            <span class="c1">// Citanje reda moze dovesti do problema zbog S ili U katanaca,</span>
+            <span class="c1">// te moramo poziv metoda next() obraditi zasebno,</span>
+            <span class="c1">// pa zato ide unutar petlje za obradu.</span>
+            <span class="kt">boolean</span> <span class="n">ima_redova</span> <span class="o">=</span> <span class="kc">true</span><span class="o">;</span>
+            <span class="k">while</span><span class="o">(</span><span class="kc">true</span><span class="o">)</span> <span class="o">{</span>
+                <span class="c1">// S ili U katanac</span>
+                <span class="k">try</span> <span class="o">{</span>
+                    <span class="n">ima_redova</span> <span class="o">=</span> <span class="n">kursor</span><span class="o">.</span><span class="na">next</span><span class="o">();</span>
+                <span class="o">}</span>
+                <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="c1">// Obrada katanaca</span>
+                    <span class="k">if</span> <span class="o">(</span><span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">==</span> <span class="o">-</span><span class="mi">911</span> <span class="o">||</span> <span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">==</span> <span class="o">-</span><span class="mi">913</span><span class="o">)</span> <span class="o">{</span>
+                        <span class="n">kursor</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                        <span class="n">kursor</span> <span class="o">=</span> <span class="n">obradiCekanje</span><span class="o">(</span><span class="s">"FETCH"</span><span class="o">,</span> <span class="n">con</span><span class="o">,</span> <span class="n">stmt</span><span class="o">,</span> <span class="n">sql</span><span class="o">);</span>
+                        <span class="k">continue</span><span class="o">;</span>
+                    <span class="o">}</span>
+                    <span class="k">throw</span> <span class="n">e</span><span class="o">;</span>
+                <span class="o">}</span>
+                
+                <span class="c1">// Izlaz iz beskonacne petlje</span>
+                <span class="c1">// ukoliko vise nema redova u kursoru</span>
+                <span class="k">if</span> <span class="o">(!</span><span class="n">ima_redova</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="k">break</span><span class="o">;</span>
+                <span class="o">}</span>
+                
+                <span class="c1">// Inace, dohvatamo podatke</span>
+                <span class="kt">int</span> <span class="n">id_predmeta</span> <span class="o">=</span> <span class="n">kursor</span><span class="o">.</span><span class="na">getInt</span><span class="o">(</span><span class="mi">1</span><span class="o">);</span>
+                <span class="n">String</span> <span class="n">naziv</span> <span class="o">=</span> <span class="n">kursor</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="mi">2</span><span class="o">);</span>
+                <span class="kt">short</span> <span class="n">bodovi</span> <span class="o">=</span> <span class="n">kursor</span><span class="o">.</span><span class="na">getShort</span><span class="o">(</span><span class="mi">3</span><span class="o">);</span>
+                
+                <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">printf</span><span class="o">(</span><span class="s">"\nPredmet %s ima %d bodova\n"</span><span class="o">,</span> <span class="n">naziv</span><span class="o">.</span><span class="na">trim</span><span class="o">(),</span> <span class="n">bodovi</span><span class="o">);</span>
+                <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Da li zelite da uvecate broj bodova za 1? [da/ne]"</span><span class="o">);</span>
+                
+                <span class="n">String</span> <span class="n">odgovor</span> <span class="o">=</span> <span class="n">ulaz</span><span class="o">.</span><span class="na">next</span><span class="o">();</span>
+                <span class="k">if</span> <span class="o">(</span><span class="n">odgovor</span><span class="o">.</span><span class="na">equalsIgnoreCase</span><span class="o">(</span><span class="s">"da"</span><span class="o">))</span> <span class="o">{</span>
+                    <span class="c1">// X katanac</span>
+                    <span class="k">try</span> <span class="o">{</span>
+                        <span class="c1">// Ovde koristimo metode updateXXX i updateRow za azuriranje podataka.</span>
+                        <span class="c1">// Za vezbu uraditi zadatak pozicionirajucom UPDATE naredbom.</span>
+                        <span class="n">kursor</span><span class="o">.</span><span class="na">updateShort</span><span class="o">(</span><span class="mi">3</span><span class="o">,</span> <span class="o">(</span><span class="kt">short</span><span class="o">)</span> <span class="o">(</span><span class="n">bodovi</span> <span class="o">+</span> <span class="mi">1</span><span class="o">));</span>
+                        <span class="n">kursor</span><span class="o">.</span><span class="na">updateRow</span><span class="o">();</span>
+                    <span class="o">}</span>
+                    <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+                        <span class="k">if</span> <span class="o">(</span><span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">==</span> <span class="o">-</span><span class="mi">911</span> <span class="o">||</span> <span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">==</span> <span class="o">-</span><span class="mi">913</span><span class="o">)</span> <span class="o">{</span>
+                            <span class="n">kursor</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                            <span class="n">kursor</span> <span class="o">=</span> <span class="n">obradiCekanje</span><span class="o">(</span><span class="s">"UPDATE"</span><span class="o">,</span> <span class="n">con</span><span class="o">,</span> <span class="n">stmt</span><span class="o">,</span> <span class="n">sql</span><span class="o">);</span>
+                            <span class="k">continue</span><span class="o">;</span>
+                        <span class="o">}</span>
+                        <span class="k">throw</span> <span class="n">e</span><span class="o">;</span>
+                    <span class="o">}</span>
+                    
+                    <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Uspesno su azurirani bodovi za tekuci predmet!"</span><span class="o">);</span>
+                <span class="o">}</span>
+                
+                <span class="c1">// Evidentiranje obrade predstavlja INSERT naredbu</span>
+                <span class="c1">// koja takodje moze dovesti do problema visekorisnickog okruzenja,</span>
+                <span class="c1">// tako da moramo obraditi katance i u ovom slucaju</span>
+                <span class="k">try</span> <span class="o">{</span>
+                    <span class="n">evidentirajPredmetKaoObradjen</span><span class="o">(</span><span class="n">con</span><span class="o">,</span> <span class="n">id_predmeta</span><span class="o">);</span>
+                <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="k">if</span> <span class="o">(</span><span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">==</span> <span class="o">-</span><span class="mi">911</span> <span class="o">||</span> <span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">==</span> <span class="o">-</span><span class="mi">913</span><span class="o">)</span> <span class="o">{</span>
+                        <span class="n">kursor</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                        <span class="n">kursor</span> <span class="o">=</span> <span class="n">obradiCekanje</span><span class="o">(</span><span class="s">"INSERT"</span><span class="o">,</span> <span class="n">con</span><span class="o">,</span> <span class="n">stmt</span><span class="o">,</span> <span class="n">sql</span><span class="o">);</span>
+                        <span class="k">continue</span><span class="o">;</span>
+                    <span class="o">}</span>
+                    <span class="k">throw</span> <span class="n">e</span><span class="o">;</span>
+                <span class="o">}</span>
+                
+                
+                <span class="c1">// Zavrsavamo jednu transakciju</span>
+                <span class="n">con</span><span class="o">.</span><span class="na">commit</span><span class="o">();</span>
+                
+                <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Da li zelite da zavrsite sa obradom? [da/ne]"</span><span class="o">);</span>
+                <span class="n">odgovor</span> <span class="o">=</span> <span class="n">ulaz</span><span class="o">.</span><span class="na">next</span><span class="o">();</span>
+                
+                <span class="k">if</span> <span class="o">(</span><span class="n">odgovor</span><span class="o">.</span><span class="na">equalsIgnoreCase</span><span class="o">(</span><span class="s">"da"</span><span class="o">))</span> <span class="o">{</span>
+                    <span class="k">break</span><span class="o">;</span>
+                <span class="o">}</span>
+            <span class="o">}</span>
+            
+            <span class="n">kursor</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+            <span class="n">stmt</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+    
+    <span class="kd">private</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">evidentirajPredmetKaoObradjen</span><span class="o">(</span><span class="n">Connection</span> <span class="n">con</span><span class="o">,</span> <span class="kt">int</span> <span class="n">id_predmeta</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span> <span class="o">{</span>
+        <span class="n">String</span> <span class="n">sql</span> <span class="o">=</span> 
+            <span class="s">"INSERT INTO OBRADJENI_PREDMETI "</span> <span class="o">+</span>
+            <span class="s">"VALUES (?)"</span><span class="o">;</span>
+        <span class="n">PreparedStatement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">prepareStatement</span><span class="o">(</span><span class="n">sql</span><span class="o">);</span>
+        
+        <span class="n">stmt</span><span class="o">.</span><span class="na">setInt</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="n">id_predmeta</span><span class="o">);</span>
+        <span class="n">stmt</span><span class="o">.</span><span class="na">executeUpdate</span><span class="o">();</span>
+        
+        <span class="n">stmt</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="n">ResultSet</span> <span class="nf">otvoriKursor</span><span class="o">(</span><span class="n">Statement</span> <span class="n">stmt</span><span class="o">,</span> <span class="n">String</span> <span class="n">sql</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span> <span class="o">{</span>
+        <span class="n">ResultSet</span> <span class="n">kursor</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">executeQuery</span><span class="o">(</span><span class="n">sql</span><span class="o">);</span>
+        <span class="k">return</span> <span class="n">kursor</span><span class="o">;</span>
+    <span class="o">}</span>
+    
+    <span class="kd">private</span> <span class="kd">static</span> <span class="n">ResultSet</span> <span class="nf">obradiCekanje</span><span class="o">(</span><span class="n">String</span> <span class="n">codeHint</span><span class="o">,</span> <span class="n">Connection</span> <span class="n">con</span><span class="o">,</span> <span class="n">Statement</span> <span class="n">stmt</span><span class="o">,</span> <span class="n">String</span> <span class="n">sql</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span> <span class="o">{</span>
+        <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">printf</span><span class="o">(</span><span class="s">"[%s] Objekat je zakljucan od strane druge transakcije!\n"</span> <span class="o">+</span>
+                <span class="s">"Molimo sacekajte!\n"</span><span class="o">,</span> <span class="n">codeHint</span><span class="o">);</span>
+        
+        <span class="k">try</span> <span class="o">{</span>
+            <span class="n">con</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+        <span class="o">}</span>
+        
+        <span class="k">return</span> <span class="nf">otvoriKursor</span><span class="o">(</span><span class="n">stmt</span><span class="o">,</span> <span class="n">sql</span><span class="o">);</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h2 id="93-povezivanje-na-više-baza-podataka">9.3 Povezivanje na više baza podataka</h2>
+
+<p>Upravljanje podacima nad više baza podataka u JDBC aplikacijama je značajno jednostavnije
+nego u C aplikacijama sa ugnežđenim SQL-om.</p>
+
+<p>U JDBC aplikacijama možemo imati proizvoljan broj objekata klase Connection i svaki
+od njih predstavlja i ostvaruje konekciju ka jednoj bazi podataka. Pretpostavimo da
+imamo dve konekcije ka bazama podataka X i Y ostvarene kroz objekte conX i conY klase
+Connection.</p>
+
+<p>Ukoliko je potrebno da izvršimo naredbu nad bazom podataka X, onda je potrebno da kreiramo
+objekat naredbe (bilo kroz klasu Statement ili PreparedStatement) koristeći objekat
+conX. Za izvršavanje naredbe nad drugom bazom podataka Y, koristićemo objekat conY
+za kreiranje objekta naredbe.</p>
+
+<p>Naredni primer ilustruje korišćenje dve baze podataka: VSTUD i MSTUD.</p>
+
+<div style="border: 2px solid rgb(196, 41, 255); padding: 5px; background-color: rgba(197, 197, 197, 0.3); margin: 10px 0;">
+    <p style="font-weight: bold;">Zadatak 9.3</p>
+    Napisati Java program u kojem se SQL naredbe izvršavaju dinamički koji omogućava konekciju na 2 baze (vstud i mstud). Program redom:<br />
+<br />
+1. Zahteva od korisnika da unese broj bodova _B_.<br />
+2. Iz baze mstud izdvaja indeks, ime i prezime studenata koji su položili sve predmete koji nose više od _B_ bodova.<br />
+3. Zatim, zahteva od korisnika da unese ocenu _O_ (ceo broj od 6 do 10).<br />
+4. Iz baze vstud izlistava indeks, naziv, ocenu, godinu i oznaku ispitnog roka za sve studente koji nikada nisu dobili ocenu manju nego što je ocena _O_.<br />
+5. Nakon ispisivanja tih podataka, u bazi mstud, iz tabele ispit briše sva polaganja za studenta sa maksimalnim brojem indeksa _I_ iz dosije, i vraća _I_.<br />
+6. Na kraju, u bazi vstud, u tabeli predmet za sve predmete koje je položio student sa brojem indeksa _I_, uvećava broj bodova za jedan (osim ako je broj bodova veći od 10, tada ostavlja nepromenjeno stanje).
+</div>
+
+<p>Rešenje:</p>
+
+<p>Datoteka: <code class="highlighter-rouge">primeri/poglavlje_9/src/zadatak_9_3/Main.java</code>:</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">package</span> <span class="n">zadatak_9_3</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">java.io.File</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.io.FileNotFoundException</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.*</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.util.Scanner</span><span class="o">;</span>
+
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">Main</span> <span class="o">{</span>
+    <span class="kd">static</span> <span class="o">{</span>
+        <span class="k">try</span> <span class="o">{</span>
+            <span class="n">Class</span><span class="o">.</span><span class="na">forName</span><span class="o">(</span><span class="s">"com.ibm.db2.jcc.DB2Driver"</span><span class="o">);</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">Exception</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">main</span><span class="o">(</span><span class="n">String</span> <span class="n">argv</span><span class="o">[])</span> <span class="o">{</span>
+        <span class="n">String</span> <span class="n">urlVstud</span> <span class="o">=</span> <span class="s">"jdbc:db2://localhost:50001/vstud"</span><span class="o">;</span>
+        <span class="n">Connection</span> <span class="n">conVstud</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+
+        <span class="n">String</span> <span class="n">urlMstud</span> <span class="o">=</span> <span class="s">"jdbc:db2://localhost:50001/mstud"</span><span class="o">;</span>
+        <span class="n">Connection</span> <span class="n">conMstud</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+
+        <span class="k">try</span> <span class="o">{</span>
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Povezivanje na VSTUD..."</span><span class="o">);</span>
+            <span class="n">conVstud</span> <span class="o">=</span> <span class="n">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">urlVstud</span><span class="o">,</span> <span class="s">"student"</span><span class="o">,</span> <span class="s">"abcdef"</span><span class="o">);</span>
+            <span class="n">conVstud</span><span class="o">.</span><span class="na">setAutoCommit</span><span class="o">(</span><span class="kc">false</span><span class="o">);</span>
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Uspesno je ostvarena konekcija!"</span><span class="o">);</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Povezivanje na MSTUD..."</span><span class="o">);</span>
+            <span class="n">conMstud</span> <span class="o">=</span> <span class="n">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">urlMstud</span><span class="o">,</span> <span class="s">"student"</span><span class="o">,</span> <span class="s">"abcdef"</span><span class="o">);</span>
+            <span class="n">conMstud</span><span class="o">.</span><span class="na">setAutoCommit</span><span class="o">(</span><span class="kc">false</span><span class="o">);</span>
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Uspesno je ostvarena konekcija!"</span><span class="o">);</span>
+
+            <span class="k">try</span> <span class="o">(</span><span class="n">Scanner</span> <span class="n">ulaz</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Scanner</span><span class="o">(</span><span class="n">System</span><span class="o">.</span><span class="na">in</span><span class="o">))</span> <span class="o">{</span>
+                <span class="c1">// Program redom:</span>
+                <span class="c1">// Zahteva od korisnika da unese broj bodova B.</span>
+
+                <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Unesite broj bodova B:"</span><span class="o">);</span>
+                <span class="kt">short</span> <span class="n">brojBodova</span> <span class="o">=</span> <span class="n">ulaz</span><span class="o">.</span><span class="na">nextShort</span><span class="o">();</span>
+
+                <span class="c1">// Iz baze MSTUD izdvaja indeks, ime i prezime studenata</span>
+                <span class="c1">// koji su polozili sve predmete koji nose vise od B bodova.</span>
+
+                <span class="n">izlistajStudenteMstud</span><span class="o">(</span><span class="n">conMstud</span><span class="o">,</span> <span class="n">brojBodova</span><span class="o">);</span>
+
+                <span class="c1">// Zatim, zahteva od korisnika da unese ocenu O (ceo broj od 6</span>
+                <span class="c1">// do 10).</span>
+
+                <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Unesite ocenu O:"</span><span class="o">);</span>
+                <span class="kt">short</span> <span class="n">ocena</span> <span class="o">=</span> <span class="n">ulaz</span><span class="o">.</span><span class="na">nextShort</span><span class="o">();</span>
+
+                <span class="c1">// Iz baze VSTUD izlistava indeks, naziv, ocenu, godinu i oznaku</span>
+                <span class="c1">// ispitnog roka</span>
+                <span class="c1">// za sve studente koji nikada nisu dobili ocenu manju nego sto</span>
+                <span class="c1">// je ocena O.</span>
+
+                <span class="n">izlistajPolaganjaVstud</span><span class="o">(</span><span class="n">conVstud</span><span class="o">,</span> <span class="n">ocena</span><span class="o">);</span>
+
+                <span class="c1">// Nakon ispisivanja tih podataka, u bazi MSTUD, iz tabele ISPIT</span>
+                <span class="c1">// brise sva polaganja za studenta sa maksimalnim brojem indeksa</span>
+                <span class="c1">// I</span>
+                <span class="c1">// iz DOSIJE, i vraca I.</span>
+
+                <span class="kt">int</span> <span class="n">indeks</span> <span class="o">=</span> <span class="n">obrisiPolaganjaIVratiIndeksMstud</span><span class="o">(</span><span class="n">conMstud</span><span class="o">);</span>
+
+                <span class="c1">// Na kraju, u bazi VSTUD, u tabeli PREDMET</span>
+                <span class="c1">// za sve predmete koje je polozio student sa brojem indeksa I,</span>
+                <span class="c1">// uvecava broj bodova za jedan (osim ako je broj bodova veci od</span>
+                <span class="c1">// 10,</span>
+                <span class="c1">// tada ostavlja nepromenjeno stanje).</span>
+
+                <span class="n">uvecajBodoveZaPredmeteVstud</span><span class="o">(</span><span class="n">conVstud</span><span class="o">,</span> <span class="n">indeks</span><span class="o">);</span>
+            <span class="o">}</span>
+
+            <span class="c1">// Potvrdjivanje izmena i zatvaranje konekcije</span>
+            <span class="c1">// mora da se vrsi nad obe baze!</span>
+            <span class="n">conVstud</span><span class="o">.</span><span class="na">commit</span><span class="o">();</span>
+            <span class="n">conVstud</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+
+            <span class="n">conMstud</span><span class="o">.</span><span class="na">commit</span><span class="o">();</span>
+            <span class="n">conMstud</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"SQLCODE: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getErrorCode</span><span class="o">()</span> <span class="o">+</span> <span class="s">"\n"</span> <span class="o">+</span> <span class="s">"SQLSTATE: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getSQLState</span><span class="o">()</span> <span class="o">+</span> <span class="s">"\n"</span>
+                    <span class="o">+</span> <span class="s">"PORUKA: "</span> <span class="o">+</span> <span class="n">e</span><span class="o">.</span><span class="na">getMessage</span><span class="o">());</span>
+
+            <span class="k">try</span> <span class="o">{</span>
+                <span class="c1">// Ponistavanje izmena i zatvaranje konekcije</span>
+                <span class="c1">// mora da se vrsi nad obe baze!</span>
+                <span class="k">if</span> <span class="o">(</span><span class="kc">null</span> <span class="o">!=</span> <span class="n">conVstud</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="n">conVstud</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+                    <span class="n">conVstud</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                <span class="o">}</span>
+                <span class="k">if</span> <span class="o">(</span><span class="kc">null</span> <span class="o">!=</span> <span class="n">conMstud</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="n">conMstud</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+                    <span class="n">conMstud</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                <span class="o">}</span>
+            <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e2</span><span class="o">)</span> <span class="o">{</span>
+            <span class="o">}</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">exit</span><span class="o">(</span><span class="mi">1</span><span class="o">);</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">Exception</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+
+            <span class="k">try</span> <span class="o">{</span>
+                <span class="k">if</span> <span class="o">(</span><span class="kc">null</span> <span class="o">!=</span> <span class="n">conVstud</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="n">conVstud</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+                    <span class="n">conVstud</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                <span class="o">}</span>
+                <span class="k">if</span> <span class="o">(</span><span class="kc">null</span> <span class="o">!=</span> <span class="n">conMstud</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="n">conMstud</span><span class="o">.</span><span class="na">rollback</span><span class="o">();</span>
+                    <span class="n">conMstud</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+                <span class="o">}</span>
+            <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">SQLException</span> <span class="n">e2</span><span class="o">)</span> <span class="o">{</span>
+            <span class="o">}</span>
+
+            <span class="n">System</span><span class="o">.</span><span class="na">exit</span><span class="o">(</span><span class="mi">2</span><span class="o">);</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">izlistajStudenteMstud</span><span class="o">(</span><span class="n">Connection</span> <span class="n">con</span><span class="o">,</span> <span class="kt">short</span> <span class="n">brojBodova</span><span class="o">)</span>
+            <span class="kd">throws</span> <span class="n">SQLException</span><span class="o">,</span> <span class="n">FileNotFoundException</span> <span class="o">{</span>
+        <span class="n">String</span> <span class="n">sql</span> <span class="o">=</span> <span class="n">ucitajSqlIzDatoteke</span><span class="o">(</span><span class="s">"izlistajStudenteMstud.sql"</span><span class="o">);</span>
+        <span class="n">PreparedStatement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">prepareStatement</span><span class="o">(</span><span class="n">sql</span><span class="o">);</span>
+
+        <span class="n">stmt</span><span class="o">.</span><span class="na">setShort</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="n">brojBodova</span><span class="o">);</span>
+        <span class="n">ResultSet</span> <span class="n">rez</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">executeQuery</span><span class="o">();</span>
+
+        <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"\n\nStudenti koji su polozili sve predmete od "</span> <span class="o">+</span> <span class="n">brojBodova</span> <span class="o">+</span> <span class="s">" bodova\n"</span><span class="o">);</span>
+        <span class="k">while</span> <span class="o">(</span><span class="n">rez</span><span class="o">.</span><span class="na">next</span><span class="o">())</span> <span class="o">{</span>
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Indeks: "</span> <span class="o">+</span> <span class="n">rez</span><span class="o">.</span><span class="na">getInt</span><span class="o">(</span><span class="mi">1</span><span class="o">)</span> <span class="o">+</span> <span class="s">", "</span> <span class="o">+</span> <span class="s">"Ime: "</span> <span class="o">+</span> <span class="n">rez</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="mi">2</span><span class="o">).</span><span class="na">trim</span><span class="o">()</span> <span class="o">+</span> <span class="s">", "</span>
+                    <span class="o">+</span> <span class="s">"Prezime: "</span> <span class="o">+</span> <span class="n">rez</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="mi">3</span><span class="o">).</span><span class="na">trim</span><span class="o">()</span> <span class="o">+</span> <span class="s">", "</span><span class="o">);</span>
+        <span class="o">}</span>
+
+        <span class="n">rez</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+        <span class="n">stmt</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">izlistajPolaganjaVstud</span><span class="o">(</span><span class="n">Connection</span> <span class="n">con</span><span class="o">,</span> <span class="kt">short</span> <span class="n">ocena</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">SQLException</span><span class="o">,</span> <span class="n">FileNotFoundException</span> <span class="o">{</span>
+        <span class="n">String</span> <span class="n">sql</span> <span class="o">=</span> <span class="n">ucitajSqlIzDatoteke</span><span class="o">(</span><span class="s">"izlistajPolaganjaVstud.sql"</span><span class="o">);</span>
+        <span class="n">PreparedStatement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">prepareStatement</span><span class="o">(</span><span class="n">sql</span><span class="o">);</span>
+
+        <span class="n">stmt</span><span class="o">.</span><span class="na">setShort</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="n">ocena</span><span class="o">);</span>
+        <span class="n">ResultSet</span> <span class="n">rez</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">executeQuery</span><span class="o">();</span>
+
+        <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Polozeni ispiti studenata koji nemaju ocenu manju od "</span> <span class="o">+</span> <span class="n">ocena</span><span class="o">);</span>
+        <span class="k">while</span> <span class="o">(</span><span class="n">rez</span><span class="o">.</span><span class="na">next</span><span class="o">())</span> <span class="o">{</span>
+            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Indeks: "</span> <span class="o">+</span> <span class="n">rez</span><span class="o">.</span><span class="na">getInt</span><span class="o">(</span><span class="mi">1</span><span class="o">)</span> <span class="o">+</span> <span class="s">", "</span> <span class="o">+</span> <span class="s">"Naziv: "</span> <span class="o">+</span> <span class="n">rez</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="mi">2</span><span class="o">).</span><span class="na">trim</span><span class="o">()</span> <span class="o">+</span> <span class="s">", "</span>
+                    <span class="o">+</span> <span class="s">"Ocena: "</span> <span class="o">+</span> <span class="n">rez</span><span class="o">.</span><span class="na">getInt</span><span class="o">(</span><span class="mi">3</span><span class="o">)</span> <span class="o">+</span> <span class="s">", "</span> <span class="o">+</span> <span class="s">"Godina roka: "</span> <span class="o">+</span> <span class="n">rez</span><span class="o">.</span><span class="na">getInt</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">+</span> <span class="s">", "</span> <span class="o">+</span> <span class="s">"Oznaka roka: "</span>
+                    <span class="o">+</span> <span class="n">rez</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="mi">5</span><span class="o">).</span><span class="na">trim</span><span class="o">());</span>
+        <span class="o">}</span>
+
+        <span class="n">rez</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+        <span class="n">stmt</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="kt">int</span> <span class="nf">obrisiPolaganjaIVratiIndeksMstud</span><span class="o">(</span><span class="n">Connection</span> <span class="n">con</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">Exception</span> <span class="o">{</span>
+        <span class="kt">int</span> <span class="n">indeks</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span>
+        <span class="n">Statement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">createStatement</span><span class="o">();</span>
+        <span class="n">ResultSet</span> <span class="n">rez</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">executeQuery</span><span class="o">(</span>
+            <span class="s">"SELECT MAX(INDEKS) "</span> <span class="o">+</span> 
+            <span class="s">"FROM   DOSIJE"</span><span class="o">);</span>
+
+        <span class="kt">boolean</span> <span class="n">dohvacenIndeks</span> <span class="o">=</span> <span class="n">rez</span><span class="o">.</span><span class="na">next</span><span class="o">();</span>
+        <span class="k">if</span> <span class="o">(!</span><span class="n">dohvacenIndeks</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">stmt</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+            <span class="k">throw</span> <span class="k">new</span> <span class="nf">Exception</span><span class="o">(</span><span class="s">"Ne postoji nijedan indeks u bazi podataka"</span><span class="o">);</span>
+        <span class="o">}</span>
+
+        <span class="n">indeks</span> <span class="o">=</span> <span class="n">rez</span><span class="o">.</span><span class="na">getInt</span><span class="o">(</span><span class="mi">1</span><span class="o">);</span>
+        <span class="n">rez</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+
+        <span class="kt">int</span> <span class="n">brojObrisanih</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">executeUpdate</span><span class="o">(</span>
+            <span class="s">"DELETE FROM ISPIT "</span> <span class="o">+</span> 
+            <span class="s">"WHERE  INDEKS = (SELECT MAX(INDEKS) FROM DOSIJE)"</span><span class="o">);</span>        
+        <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Broj obrisanih redova: "</span> <span class="o">+</span> <span class="n">brojObrisanih</span><span class="o">);</span>
+        
+        <span class="n">stmt</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+        <span class="k">return</span> <span class="n">indeks</span><span class="o">;</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">uvecajBodoveZaPredmeteVstud</span><span class="o">(</span><span class="n">Connection</span> <span class="n">con</span><span class="o">,</span> <span class="kt">int</span> <span class="n">indeks</span><span class="o">)</span> 
+            <span class="kd">throws</span> <span class="n">SQLException</span><span class="o">,</span> <span class="n">FileNotFoundException</span> <span class="o">{</span>
+        <span class="n">String</span> <span class="n">sql</span> <span class="o">=</span> <span class="n">ucitajSqlIzDatoteke</span><span class="o">(</span><span class="s">"uvecajBodoveZaPredmeteVstud.sql"</span><span class="o">);</span>
+        <span class="n">PreparedStatement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">prepareStatement</span><span class="o">(</span><span class="n">sql</span><span class="o">);</span>
+        <span class="n">stmt</span><span class="o">.</span><span class="na">setInt</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="n">indeks</span><span class="o">);</span>
+
+        <span class="kt">int</span> <span class="n">brojAzuriranih</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">executeUpdate</span><span class="o">();</span>
+        <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"Broj azuriranih redova: "</span> <span class="o">+</span> <span class="n">brojAzuriranih</span><span class="o">);</span>
+        
+        <span class="n">stmt</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="n">String</span> <span class="nf">ucitajSqlIzDatoteke</span><span class="o">(</span><span class="n">String</span> <span class="n">nazivDatoteke</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">FileNotFoundException</span> <span class="o">{</span>
+        <span class="n">String</span> <span class="n">putanja</span> <span class="o">=</span> <span class="s">"./bin/zadatak_9_3/"</span> <span class="o">+</span> <span class="n">nazivDatoteke</span><span class="o">;</span>
+        <span class="n">StringBuilder</span> <span class="n">sql</span> <span class="o">=</span> <span class="k">new</span> <span class="n">StringBuilder</span><span class="o">(</span><span class="s">""</span><span class="o">);</span>
+        <span class="n">String</span> <span class="n">linija</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+
+        <span class="k">try</span> <span class="o">(</span><span class="n">Scanner</span> <span class="n">skenerFajla</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Scanner</span><span class="o">(</span><span class="k">new</span> <span class="n">File</span><span class="o">(</span><span class="n">putanja</span><span class="o">),</span> <span class="s">"utf-8"</span><span class="o">))</span> <span class="o">{</span>
+            <span class="k">while</span> <span class="o">(</span><span class="n">skenerFajla</span><span class="o">.</span><span class="na">hasNextLine</span><span class="o">())</span> <span class="o">{</span>
+                <span class="n">linija</span> <span class="o">=</span> <span class="n">skenerFajla</span><span class="o">.</span><span class="na">nextLine</span><span class="o">();</span>
+                <span class="n">sql</span><span class="o">.</span><span class="na">append</span><span class="o">(</span><span class="n">linija</span><span class="o">);</span>
+                <span class="n">sql</span><span class="o">.</span><span class="na">append</span><span class="o">(</span><span class="s">"\n"</span><span class="o">);</span>
+            <span class="o">}</span>
+        <span class="o">}</span>
+
+        <span class="k">return</span> <span class="n">sql</span><span class="o">.</span><span class="na">toString</span><span class="o">();</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>Datoteka: <code class="highlighter-rouge">primeri/poglavlje_9/src/zadatak_9_3/izlistajStudenteMstud.sql</code>:</p>
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span>  <span class="n">INDEKS</span><span class="p">,</span>
+        <span class="n">IME</span><span class="p">,</span>
+        <span class="n">PREZIME</span>  
+<span class="k">FROM</span>    <span class="n">DOSIJE</span> <span class="n">D</span>  
+<span class="k">WHERE</span>   <span class="k">NOT</span> <span class="k">EXISTS</span> <span class="p">(</span>  
+            <span class="k">SELECT</span>  <span class="o">*</span>  
+            <span class="k">FROM</span>    <span class="n">PREDMET</span> <span class="n">P</span>  
+            <span class="k">WHERE</span>   <span class="n">BODOVI</span> <span class="o">=</span> <span class="o">?</span> <span class="k">AND</span> 
+                    <span class="k">NOT</span> <span class="k">EXISTS</span> <span class="p">(</span>  
+                        <span class="k">SELECT</span>  <span class="o">*</span>  
+                        <span class="k">FROM</span>    <span class="n">ISPIT</span> <span class="n">I</span>  
+                        <span class="k">WHERE</span>   <span class="n">I</span><span class="p">.</span><span class="n">INDEKS</span> <span class="o">=</span> <span class="n">D</span><span class="p">.</span><span class="n">INDEKS</span> <span class="k">AND</span> 
+                                <span class="n">I</span><span class="p">.</span><span class="n">ID_PREDMETA</span> <span class="o">=</span> <span class="n">P</span><span class="p">.</span><span class="n">ID_PREDMETA</span> <span class="k">AND</span> 
+                                <span class="n">I</span><span class="p">.</span><span class="n">OCENA</span> <span class="o">&gt;</span> <span class="mi">5</span>  
+                    <span class="p">)</span>  
+        <span class="p">)</span>
+</code></pre></div></div>
+
+<p>Datoteka: <code class="highlighter-rouge">primeri/poglavlje_9/src/zadatak_9_3/izlistajPolaganjaVstud.sql</code>:</p>
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span>  <span class="n">INDEKS</span><span class="p">,</span> 
+        <span class="n">P</span><span class="p">.</span><span class="n">NAZIV</span><span class="p">,</span> 
+        <span class="n">OCENA</span><span class="p">,</span> 
+        <span class="n">GODINA_ROKA</span><span class="p">,</span> 
+        <span class="n">OZNAKA_ROKA</span>  
+<span class="k">FROM</span>    <span class="n">ISPIT</span> <span class="n">I</span> <span class="k">JOIN</span> 
+        <span class="n">PREDMET</span> <span class="n">P</span> <span class="k">ON</span> <span class="n">I</span><span class="p">.</span><span class="n">ID_PREDMETA</span> <span class="o">=</span> <span class="n">P</span><span class="p">.</span><span class="n">ID_PREDMETA</span>  
+<span class="k">WHERE</span>   <span class="n">OCENA</span> <span class="o">&gt;</span> <span class="mi">5</span> <span class="k">AND</span> 
+        <span class="n">STATUS_PRIJAVE</span> <span class="o">=</span> <span class="s1">'O'</span> <span class="k">AND</span> 
+        <span class="k">NOT</span> <span class="k">EXISTS</span> <span class="p">(</span>  
+            <span class="k">SELECT</span>  <span class="o">*</span>  
+            <span class="k">FROM</span>    <span class="n">ISPIT</span> <span class="n">I2</span>  
+            <span class="k">WHERE</span>   <span class="n">I</span><span class="p">.</span><span class="n">INDEKS</span> <span class="o">=</span> <span class="n">I2</span><span class="p">.</span><span class="n">INDEKS</span> <span class="k">AND</span>  
+                    <span class="n">OCENA</span> <span class="o">&lt;</span> <span class="o">?</span>  
+        <span class="p">)</span>
+</code></pre></div></div>
+
+<p>Datoteka: <code class="highlighter-rouge">primeri/poglavlje_9/src/zadatak_9_3/uvecajBodoveZaPredmeteVstud.sql</code>:</p>
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">UPDATE</span>  <span class="n">PREDMET</span> <span class="n">P</span>
+<span class="k">SET</span>     <span class="n">BODOVI</span> <span class="o">=</span> <span class="n">BODOVI</span> <span class="o">+</span> <span class="mi">1</span> 
+<span class="k">WHERE</span>   <span class="n">BODOVI</span> <span class="o">&lt;</span> <span class="mi">10</span> <span class="k">AND</span> 
+        <span class="k">EXISTS</span> <span class="p">(</span>
+            <span class="k">SELECT</span>  <span class="o">*</span>
+            <span class="k">FROM</span>    <span class="n">ISPIT</span> <span class="n">I</span> 
+            <span class="k">WHERE</span>   <span class="n">I</span><span class="p">.</span><span class="n">ID_PREDMETA</span> <span class="o">=</span> <span class="n">P</span><span class="p">.</span><span class="n">ID_PREDMETA</span> <span class="k">AND</span> 
+                    <span class="n">OCENA</span> <span class="o">&gt;</span> <span class="mi">5</span>
+                    <span class="k">AND</span> <span class="n">INDEKS</span> <span class="o">=</span> <span class="o">?</span>
+        <span class="p">)</span>
+</code></pre></div></div>
+
+<h2 id="94-zadaci-za-vežbu">9.4 Zadaci za vežbu</h2>
+
+<div style="border: 2px solid rgb(196, 41, 255); padding: 5px; background-color: rgba(197, 197, 197, 0.3); margin: 10px 0;">
+    <p style="font-weight: bold;">Zadatak 9.4</p>
+    Napisati Java program u kojem se SQL naredbe izvršavaju dinamički koji za sve ispitne rokove pronalazi
+informacije o polaganjima za svaki položeni predmet u tom ispitnom roku i te podatke unosi u tabelu <span style="color: #e83e8c; background-color: #eef; padding: 1px 5px; font-family: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;">ISPITNI_ROKOVI_POLAGANJA</span>. Kreirati datu tabelu na osnovu SQL koda ispod.<br />
+<br />
+Pre jednog unosa podataka ispisati podatke koji ce biti uneti. Takođe, omogućiti da se podaci unose tako što korisnik mora da odobri unos podataka na svakih 20 redova (tzv. _batch_ unos podataka). Napisati program tako da može da radi u višekorisničkom okruženju. Unos podataka za jedno polaganje predstavlja jednu transakciju. Postaviti istek vremena za zahtevanje katanaca na 5 sekundi. Obraditi sve moguće greške.<br />
+<br />
+SQL naredbe za kreiranje i brisanje tabele sačuvati u datotekama 2a.sql i 2b.sql, redom, a <span style="color: #e83e8c; background-color: #eef; padding: 1px 5px; font-family: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;">SELECT</span> naredbu kojim se izdvajaju potrebni podaci sačuvati u datoteci 2c.sql.
+</div>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">ISPITNI_ROKOVI_POLAGANJA</span> <span class="p">(</span>
+    <span class="n">GODINA</span> <span class="n">SMALLINT</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">OZNAKA</span> <span class="n">VARCHAR</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">ID_PREDMETA</span> <span class="n">INTEGER</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">OCENA</span> <span class="n">SMALLINT</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">BROJ</span> <span class="n">INTEGER</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">NAZIV_ROKA</span> <span class="n">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">),</span>
+    <span class="n">NAZIV_PREDMETA</span> <span class="n">VARCHAR</span><span class="p">(</span><span class="mi">200</span><span class="p">),</span>
+    <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">(</span><span class="n">GODINA</span><span class="p">,</span> <span class="n">OZNAKA</span><span class="p">,</span> <span class="n">ID_PREDMETA</span><span class="p">,</span> <span class="n">OCENA</span><span class="p">,</span> <span class="n">BROJ</span><span class="p">)</span>
+<span class="p">)</span>
+</code></pre></div></div>
+
+<p>Pomoć pri rešavanju zadatka: Kreirati tabelu <code class="highlighter-rouge">OBRADJENA_POLAGANJA</code> na osnovu SQL koda ispod koja će sadržati informacije o već obrađenim polaganjima iz tabele <code class="highlighter-rouge">ISPITNI_ROKOVI_POLAGANJA</code>. Nakon svake obrade jednog polaganja, uneti novi red u ovu tabelu i potvrditi izmene.</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">OBRADJENA_POLAGANJA</span> <span class="p">(</span>
+    <span class="n">GODINA</span> <span class="n">SMALLINT</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">OZNAKA</span> <span class="n">VARCHAR</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">ID_PREDMETA</span> <span class="n">INTEGER</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">OCENA</span> <span class="n">SMALLINT</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">BROJ</span> <span class="n">INTEGER</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">(</span><span class="n">GODINA</span><span class="p">,</span> <span class="n">OZNAKA</span><span class="p">,</span> <span class="n">ID_PREDMETA</span><span class="p">,</span> <span class="n">OCENA</span><span class="p">,</span> <span class="n">BROJ</span><span class="p">),</span>
+    <span class="k">FOREIGN</span> <span class="k">KEY</span><span class="p">(</span><span class="n">GODINA</span><span class="p">,</span> <span class="n">OZNAKA</span><span class="p">,</span> <span class="n">ID_PREDMETA</span><span class="p">,</span> <span class="n">OCENA</span><span class="p">,</span> <span class="n">BROJ</span><span class="p">)</span> <span class="k">REFERENCES</span> <span class="n">ISPITNI_ROKOVI_POLAGANJA</span>
+<span class="p">)</span>
+</code></pre></div></div>
+
+<div style="border: 2px solid rgb(196, 41, 255); padding: 5px; background-color: rgba(197, 197, 197, 0.3); margin: 10px 0;">
+    <p style="font-weight: bold;">Zadatak 9.5</p>
+    Napisati Java program u kojem se SQL naredbe izvršavaju dinamički koji redom:<br />
+<br />
+1. Naredbama <span style="color: #e83e8c; background-color: #eef; padding: 1px 5px; font-family: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;">INSERT</span> unosi podatke o nekoliko stipendija u tabelu <span style="color: #e83e8c; background-color: #eef; padding: 1px 5px; font-family: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;">STIPENDIJA</span>. Izračunati i broj unetih redova. U slučaju da je broj unetih redova jednak nuli, ispisati poruku ”Nijedan red nije dodat”, a inače ispisati poruku u unetom broju redova. Kreirati datu tabelu na osnovu SQL koda ispod.<br />
+2. Za svaku stipendiju, pita korisnika da li želi da promeni broj studenata za tu stipendiju i ukoliko je odgovor korinika potvrdan, od korisnika traži da unese novi broj studenata i izvršava odgovarajuću naredbu.<br />
+3. Za svaku stipendiju, pita korisnika da li želi da obriše tu stipendiju i ukoliko je odgovor korinika potvrdan, izvršava odgovarajuću naredbu.<br />
+<br />
+Aplikacija treba da radi u višekorisničkom okruženju. Obrada jedne stipendije u svim zahtevima treba da predstavlja jednu transakciju. Postaviti istek vremena na 5 sekundi.
+</div>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">STIPENDIJA</span> <span class="p">(</span>
+    <span class="n">ID_STIPENDIJE</span> <span class="n">INTEGER</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">NAZIV</span> <span class="n">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">GODINA</span> <span class="n">SMALLINT</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">BROJ_STIPENDISTA</span> <span class="n">SMALLINT</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+    <span class="n">VISINA_STIPENDIJE</span> <span class="n">SMALLINT</span><span class="p">,</span>
+    <span class="k">MIN</span> <span class="n">PROSEK</span> <span class="n">FLOAT</span><span class="p">,</span>
+    <span class="n">NAPOMENA</span> <span class="n">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">),</span>
+    <span class="k">PRIMARY</span> <span class="k">KEY</span> <span class="p">(</span><span class="n">ID_STIPENDIJE</span><span class="p">)</span>
+<span class="p">)</span>
+</code></pre></div></div>
+
+<div style="border: 2px solid rgb(196, 41, 255); padding: 5px; background-color: rgba(197, 197, 197, 0.3); margin: 10px 0;">
+    <p style="font-weight: bold;">Zadatak 9.6</p>
+    Napisati Java program u kojem se SQL naredbe izvršavaju dinamički koji omogućava konekciju na 2 baze (vstud i mstud). Program redom:<br />
+<br />
+1. Iz baze mstud ispisuje naziv predmeta, za svaki predmet koji postoji u toj bazi.<br />
+2. Iz baze vstud, za svaki predmet iz prethodnog koraka, ispisuje ime i prezime studenta koji su položili taj predmet, kao i ocenu koju su dobili.<br />
+<br />
+Napraviti izveštaj tako što se za svaki predmet prvo ispiše njegov naziv, a zatim se ispisuju informacije o studentima koji su ga položili. Predmete iz različitih baza podataka spajati po nazivu predmeta.
+</div>
+
+  </div>
+
+</article>
+
+        </div>
+    </main><footer class="site-footer h-card">
+    <data class="u-url" href="/PDb2BP/"></data>
+
+    <div class="wrapper">
+
+        <div class="row">
+            <h2 class="footer-heading">Programiranje Db2 baza podataka</h2>
+        </div>
+
+        <div class="footer-col-wrapper">
+            <div class="row">
+                <div class="col-6">
+                    <ul class="contact-list">
+                        <li class="p-name">Programiranje Db2 baza podataka</li><li><a class="u-email" href="mailto:nikola_ajzenhamer@math.rs">nikola_ajzenhamer@math.rs</a></li></ul>
+                </div>
+                <div class="col-6">
+                    <p>Elektronska knjiga &quot;Programiranje Db2 baza podataka&quot; dostupna besplatno na adresi&nbsp;<a
+                            href="/PDb2BP/">https://theikeofficial.github.io//PDb2BP/</a>.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</footer><script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+        integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+        crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+        integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+        crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+        integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+        crossorigin="anonymous"></script>
+</body>
+
+</html>
